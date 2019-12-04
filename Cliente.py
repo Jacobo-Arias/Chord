@@ -2,6 +2,7 @@
 import zmq
 import json
 import hashlib
+import base64
 
 class Client:
 
@@ -40,13 +41,19 @@ class Client:
             if 'nodo' in recvDict:
                 self.IPnode = recvDict['nodo'] + '5554'
             elif 'parte' in recvDict:
+                contents = recvDict['parte']
+                contents = contents.encode()
+                partecita = base64.decodestring(contents)
                 filename = open('Descargas/'+name,'ab')
-                filename.write(recvDict['parte'])
+                filename.write(partecita)
                 filename.close()
                 if len(hashlist)==0:
                     return 'Listo'
                 else:
                     hashid=hashlist.pop()
+            elif 'Error' in recvDict:
+                print('Error 404 not found')
+                break
     
     def Subir(self):
         archivo = input("Nombre del archivo con direcciones: ")
@@ -89,7 +96,8 @@ class Client:
                         break
                     else:
                         IPnodes[i][1] = comp['nodo']
-                trash = self.Coneccion({'store':[FileHashes[i],contents]})
+                part = base64.encodestring(contents)
+                trash = self.Coneccion({'store':[FileHashes[i],part.decode()]})
             filef.close()
         print("Archivo subido")
         
