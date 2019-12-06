@@ -11,19 +11,19 @@ import base64
 # sucesor = context.socket(zmq.PULL)
 # clients = context.socket(zmq.REP)
 
-class Node(Client):
+class Node():
 
-    def __init__(self,asdf):
-        Client.__init__(self,asdf)
+    def __init__(self):
         self.MyId = self.ObtenerID()
         self.MyIp = self.GetIP()
         self.predecessorIP =  None
         self.predecessorID =  None
         self.successorID = None
-        self.successor = self.GetSuccessor()
-        self.fingertable = {((self.MyId+(i**2))%2**160) : self.successor for i in range(160)} #!ID:IP
+        self.successor = None
+        self.fingertable = {((self.MyId+(i**2))%2**160) : self.MyIp for i in range(160)} #!ID:IP
         self.lastUpdate = datetime.now()
-        self.updateFingertable()
+        
+        self.context = zmq.Context()
         self.tonodo = self.context.socket(zmq.PUSH)
 
         self.fromnodo = self.context.socket(zmq.PULL)
@@ -31,6 +31,23 @@ class Node(Client):
 
         self.fromclient = self.context.socket(zmq.REP)
         self.fromclient.bind("tcp://*:5554")
+        self.start()
+
+    def start(self):
+        self.successor = input("Ip next: ")
+        self.tonodo.connect('tcp://'+ self.successor +':5555')
+        self.tonodo.send_json(self.MyId)
+        self.tonodo.disconnect('tcp://'+ self.successor +':5555')
+        self.successorID = self.fromnodo.recv_json()
+        for  oneID in self.fingertable:
+            if self.successorID > self.MyId:
+                if self.MyId < oneID <= self.successorID:
+                    self.fingertable[oneID] = self.successor
+            elif self.successorID < self.MyId:
+                if oneID > self.MyId or oneID <= self.successorID:
+                    self.fingertable[oneID] = self.successor
+                
+
 
     def run(self):
         poller = zmq.Poller()
@@ -47,7 +64,6 @@ class Node(Client):
                 self.fromclient.send_json([])
             
             recv = recvlist.pop()
-
             if 'newSuccessor' in recv:
                 successor = recv['newSuccessor'] #ID,IP
                 # if self.predecessorID < self.successorID:
@@ -58,7 +74,7 @@ class Node(Client):
                 #     for F_id in self.fingertable:
                 #         if successor[0] <= F_id:
                 #             self.fingertable[F_id] = successor[1]
-                                
+                
                 self.successor = successor[1]
                 self.successorID = successor[0]
                 self.fromclient.send_json({'nodo':self.MyIp,'ID':self.MyId})
@@ -74,10 +90,11 @@ class Node(Client):
                     if fingerT in self.fingertable:
                         fingertemp[fingerT] = self.fingertable[fingerT]
                 dicSend['newnode']=fingertemp
-                self.tonodo.connect('tcp://'+self.successor+':5555')
+                self.tonodo.connect(self.successor)
                 self.tonodo.send_json(dicSend)
-                self.tonodo.disconnect('tcp://'+self.successor+':5555')
+                self.tonodo.disconnect(self.successor)
                 self.send_files()
+
 
             elif 'newnode' in recv:
                 if self.lastUpdate < recv['time']:
@@ -90,9 +107,9 @@ class Node(Client):
                         if entry in self.fingertable:
                             fingertemp[entry] = self.fingertable[entry]
                     dicSend['newnode']=fingertemp
-                    self.tonodo.connect('tcp://'+self.successor+':5555')
+                    self.tonodo.connect(self.successor)
                     self.tonodo.send_json(dicSend)
-                    self.tonodo.disconnect('tcp://'+self.successor+':5555')
+                    self.tonodo.disconnect(self.successor)
                 else:
                     pass
                 if recv['idnew'] == self.MyId:
@@ -113,7 +130,7 @@ class Node(Client):
                             entry %= 2**160
                             self.fromclient.send_json({'ID':entry,'nodo':self.fingertable[entry]})
                         else:
-                            entry %= 2**160
+                            entry %= 2**160 
                             temp = entry
                     if recv['pregunta'] > entry:
                         self.fromclient.send_json({'ID':entry,'nodo':self.fingertable[entry]})
@@ -159,28 +176,6 @@ class Node(Client):
             except:
                 pass
 
-    def updateFingertable(self):
-        self.tonodo.connect('tcp://'+self.successor+':5555')
-        self.tonodo.send_json({'newPredecessor':self.fingertable,
-                                'idnew':self.MyId,'ipnew':self.MyIp,
-                                'time':datetime.now()})
-        self.tonodo.disconnect('tcp://'+self.successor+':5555')
-
-    def GetSuccessor(self):
-        tempnode = None
-        while True:
-            comp = self.Coneccion({'pregunta':self.MyId}) #retorna id:ip del iguiente
-            if tempnode != comp['nodo']:
-                self.IPnode = comp['nodo']
-                tempnode = comp['nodo']
-            else:
-                self.predecessor = self.IPnode
-                self.predecessor = self.predecessor.split(':')
-                self.predecessorIP = self.predecessor[0]
-                tempnode = self.Coneccion({'newSuccessor':[self.MyId,self.MyIp]})
-                self.successorID = comp['ID']
-                return comp['nodo']
-
     def GetIP(self):
         interfaces = ni.interfaces()
         if 'eth0' in interfaces:
@@ -196,4 +191,8 @@ class Node(Client):
         sha.update(My_id.encode('ascii'))
         self.MyId = int(sha.hexdigest() ,16)
         return  int(sha.hexdigest() ,16)
-        #//bin(_int_)
+
+if __name__ == "__main__":
+    Myself = Node()
+    print('Ejecutando como Nodo con:\n IP: '+ Myself.MyIp + '\n ID: ' + Myself.MyId)
+    Myself.run()
