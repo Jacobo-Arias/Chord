@@ -5,7 +5,7 @@ from uuid import getnode as get_mac
 from Cliente import Client
 import netifaces as ni
 from datetime import datetime
-from os import listdir
+from os import listdir,rmdir
 import base64
 
 # sucesor = context.socket(zmq.PULL)
@@ -93,16 +93,31 @@ class Node(Client):
                     self.tonodo.connect('tcp://'+self.successor+':5555')
                     self.tonodo.send_json(dicSend)
                     self.tonodo.disconnect('tcp://'+self.successor+':5555')
+                    
+                    bot = self.successorID
+                    idaux, ipaux = [0,0]
+                    if recv['idnew'] < self.MyId:
+                        recv['idnew'] += 2**160
+                    for entry in self.fingertable:
+                        if bot < (recv['idnew']%2**160) <= entry:
+                            idaux = entry
+                            ipaux = self.fingertable[entry]
+                    for entry in self.fingertable:
+                        if self.fingertable[entry] == ipaux and idaux <= entry:
+                            self.fingertable[entry] = recv['ipnew']
                 else:
                     pass
+                recv['idnew']%2**160
                 if recv['idnew'] == self.MyId:
                     fingertemp = recv['newnode']
                     for i in self.fingertable:
                         self.fingertable[i] = fingertemp[i]
+                    if 'predecesor' in recv:
+                        self.predecessorID = recv['predecesor']
             
             elif 'pregunta' in recv:
                 intervalo = [self.predecessorID,self.MyId]
-                if recv['pregunta'] == self.MyId:
+                if intervalo[0] < recv['hashid'] <= intervalo[1]:
                     self.fromclient.send_json({'nodo':self.MyIp,'ID':self.MyId})
                 else:
                     temp = self.MyId
@@ -118,7 +133,7 @@ class Node(Client):
                     if recv['pregunta'] > entry:
                         self.fromclient.send_json({'ID':entry,'nodo':self.fingertable[entry]})
             
-            elif 'hasid' in recv:
+            elif 'hashid' in recv:
                 intervalo = [self.predecessorID,self.MyId]
                 if intervalo[0] < recv['hashid'] <= intervalo[1]:
                     try:
@@ -129,6 +144,19 @@ class Node(Client):
                         self.fromclient.send_json({'parte':part.decode()})
                     except:
                         self.fromclient.send_json({'Error':404})
+                else: 
+                    temp = self.MyId
+                    for entry in self.fingertable:
+                        if entry < temp:
+                            entry += 2**160
+                        if recv['hashid'] > temp and recv['hashid'] <= entry:
+                            entry %= 2**160
+                            self.fromclient.send_json({'ID':entry,'nodo':self.fingertable[entry]})
+                        else:
+                            entry %= 2**160
+                            temp = entry
+                    if recv['hashid'] > entry:
+                        self.fromclient.send_json({'ID':entry,'nodo':self.fingertable[entry]})
     
             elif 'store' in recv:
                 name,part = recv['store']
@@ -144,6 +172,25 @@ class Node(Client):
                 f = open('./Files'+name,'ab')
                 f.write(part)
                 f.close()
+            
+            # elif 'retiro' in recv:
+            #     self.tonodo.connect('tcp://'+self.successor+':5555')
+            #     self.tonodo.send_json(recv)
+            #     self.tonodo.disconnect('tcp://'+self.successor+':5555')
+            #     if recv['retiro'] in self.fingertable.values():
+            #         valores = self.fingertable.values()
+            #         m=[i for i,x in enumerate(valores) if x==recv['retiro']]
+            #         reemplazo = list(self.fingertable.keys())[m[-1]+1]
+            #         cont = 0
+            #         for i in self.fingertable:
+            #             if cont in m:
+            #                 self.fingertable[i] = reemplazo
+            
+            # elif 'prpredecessorNew':
+            #     self.predecessorID,self.predecessorIP = recv['prpredecessorNew']
+
+            # elif 'successorNew':
+            #     self.successorID,self.successor = recv['successorNew']
             
     def send_files(self):
         archivos = listdir('./Files')
@@ -183,9 +230,9 @@ class Node(Client):
 
     def GetIP(self):
         interfaces = ni.interfaces()
-        if 'eth0' in interfaces:
+        if 'eth0' in interfaces: #LAN
             return ni.ifaddresses('eth0')[2][0]['addr']
-        elif 'wlp1s0' in interfaces:
+        elif 'wlp1s0' in interfaces: #WIFI
             return ni.ifaddresses('wlp1s0')[2][0]['addr']
 
     def ObtenerID(self):
@@ -197,3 +244,26 @@ class Node(Client):
         self.MyId = int(sha.hexdigest() ,16)
         return  int(sha.hexdigest() ,16)
         #//bin(_int_)
+    
+    # def retirarse(self):
+    #     self.tonodo.connect('tcp://'+self.successor+':5555')
+    #     self.tonodo.send_json({'retiro':self.MyIp})
+    #     self.tonodo.disconnect('tcp://'+self.successor+':5555')
+    #     archivos = listdir('./Files')
+    #     for element in archivos:
+    #         try:
+    #             f = open(element,'r')
+    #             file = f.read()
+    #             self.tonodo.connect('tcp://'+self.successor+':5555')
+    #             self.tonodo.send_json({'toStore':[element,file]})
+    #             self.tonodo.disconnect('tcp://'+self.successor+':5555')
+    #         except:
+    #             pass
+    #     rmdir('Files')
+    #     self.tonodo.connect('tcp://'+self.successor+':5555')
+    #     self.tonodo.send_json({'predecessorNew':[self.predecessorID,self.predecessorIP]})
+    #     self.tonodo.disconnect('tcp://'+self.successor+':5555')
+
+    #     self.tonodo.connect('tcp://'+self.predecessorIP+':5555')
+    #     self.tonodo.send_json({'successorNew':[self.successorID,self.successor]})
+    #     self.tonodo.disconnect('tcp://'+self.predecessorIP+':5555)
