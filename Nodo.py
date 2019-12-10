@@ -232,8 +232,10 @@ class Node(Client):
         interfaces = ni.interfaces()
         if 'eth0' in interfaces: #LAN
             return ni.ifaddresses('eth0')[2][0]['addr']
-        elif 'wlp1s0' in interfaces: #WIFI
-            return ni.ifaddresses('wlp1s0')[2][0]['addr']
+        elif 'enp0s31f6' in interfaces: #WIFI
+            return ni.ifaddresses('enp0s31f6')[2][0]['addr']
+        else:
+            ni.ifaddresses(interfaces[0])[2][0]['addr']
 
     def ObtenerID(self):
         mac = get_mac() #Retorna la direccion mac como entero de 48 bits

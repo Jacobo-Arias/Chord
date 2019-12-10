@@ -36,9 +36,9 @@ class Node():
     def start(self):
         self.successor = input("Ip next: ")
         self.tonodo.connect('tcp://'+ self.successor +':5555')
-        self.tonodo.send_json(self.MyId)
+        self.tonodo.send_json([self.MyId])
         self.tonodo.disconnect('tcp://'+ self.successor +':5555')
-        self.successorID = self.fromnodo.recv_json()
+        self.successorID = self.fromnodo.recv_json()[0]
         for  oneID in self.fingertable:
             if self.successorID > self.MyId:
                 if self.MyId < oneID <= self.successorID:
@@ -46,6 +46,7 @@ class Node():
             elif self.successorID < self.MyId:
                 if oneID > self.MyId or oneID <= self.successorID:
                     self.fingertable[oneID] = self.successor
+        print('sucesor: ',self.successor,' - ',self.successorID)
                 
 
 
@@ -227,8 +228,10 @@ class Node():
         interfaces = ni.interfaces()
         if 'eth0' in interfaces:
             return ni.ifaddresses('eth0')[2][0]['addr']
-        elif 'wlp1s0' in interfaces:
-            return ni.ifaddresses('wlp1s0')[2][0]['addr']
+        elif 'enp0s31f6' in interfaces: #enp0s31f6 con LAN wlp1s0 con wifi
+            return ni.ifaddresses('enp0s31f6')[2][0]['addr']
+        else:
+            ni.ifaddresses(interfaces[0])[2][0]['addr']
 
     def ObtenerID(self):
         mac = get_mac() #Retorna la direccion mac como entero de 48 bits
@@ -241,5 +244,5 @@ class Node():
 
 if __name__ == "__main__":
     Myself = Node()
-    print('Ejecutando como Nodo con:\n IP: '+ Myself.MyIp + '\n ID: ' + Myself.MyId)
+    print('Ejecutando como Nodo con:\n IP: '+ str(Myself.MyIp) + '\n ID: ' + str(Myself.MyId))
     Myself.run()

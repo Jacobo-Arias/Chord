@@ -6,7 +6,7 @@ Myself = Cliente.Client('a')
 Myself.Pedir()
 
 while True:
-    op = input(' 1. Descargar \n 2. Subir \n 3. Ser servidor \n 0.Salir')
+    op = int(input(' 1. Descargar \n 2. Subir \n 3. Ser servidor \n 0.Salir'))
     if op == 0:
         print('Bye')
         break

@@ -56,7 +56,7 @@ class Client:
                 break
     
     def Subir(self):
-        archivo = input("Nombre del archivo con direcciones: ")
+        archivo = input("Nombre del archivo: ")
         FileHashes = [] #? La lista donde estaran los hash de los pedazos y al final el nombre del archivo
         while True: #?Sacarle hash a cada pedazo y crear el json de las direcciones
             try:
@@ -66,7 +66,7 @@ class Client:
                         if not contents:
                             break
                         hash_archivo = hashlib.sha1(contents)  
-                        sha_file = hash_archivo.hexdigest().encode()
+                        sha_file = hash_archivo.hexdigest()
                         FileHashes.append(sha_file)
                     filef.close()
                 if len(FileHashes) == 0:
